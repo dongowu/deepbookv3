@@ -1225,12 +1225,9 @@ fun preorder_key_traversal<E: store>(
     let node: &Slice<u64> = df::borrow(&self.id, slice_id);
     keys.push_back(node.keys);
 
-    let mut i = 0;
-    while (i < node.vals.length()) {
-        let child = node.vals[i];
-        self.preorder_key_traversal(keys, child, depth - 1);
-        i = i + 1;
-    };
+    node.vals.do_ref!(|child| {
+        self.preorder_key_traversal(keys, *child, depth - 1);
+    });
 }
 
 #[test_only]

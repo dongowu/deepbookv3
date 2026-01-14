@@ -571,13 +571,9 @@ public fun cancel_orders<BaseAsset, QuoteAsset>(
     clock: &Clock,
     ctx: &TxContext,
 ) {
-    let mut i = 0;
-    let num_orders = order_ids.length();
-    while (i < num_orders) {
-        let order_id = order_ids[i];
-        self.cancel_order(balance_manager, trade_proof, order_id, clock, ctx);
-        i = i + 1;
-    }
+    order_ids.do_ref!(|order_id| {
+        self.cancel_order(balance_manager, trade_proof, *order_id, clock, ctx);
+    })
 }
 
 /// Cancel all open orders placed by the balance manager in the pool.
@@ -594,13 +590,9 @@ public fun cancel_all_orders<BaseAsset, QuoteAsset>(
         open_orders = inner.state.account(balance_manager.id()).open_orders().into_keys();
     };
 
-    let mut i = 0;
-    let num_orders = open_orders.length();
-    while (i < num_orders) {
-        let order_id = open_orders[i];
-        self.cancel_order(balance_manager, trade_proof, order_id, clock, ctx);
-        i = i + 1;
-    }
+    open_orders.do_ref!(|order_id| {
+        self.cancel_order(balance_manager, trade_proof, *order_id, clock, ctx);
+    })
 }
 
 /// Withdraw settled amounts to the `balance_manager`.
@@ -1393,16 +1385,7 @@ public fun get_orders<BaseAsset, QuoteAsset>(
     self: &Pool<BaseAsset, QuoteAsset>,
     order_ids: vector<u128>,
 ): vector<Order> {
-    let mut orders = vector[];
-    let mut i = 0;
-    let num_orders = order_ids.length();
-    while (i < num_orders) {
-        let order_id = order_ids[i];
-        orders.push_back(self.get_order(order_id));
-        i = i + 1;
-    };
-
-    orders
+    order_ids.map_ref!(|order_id| self.get_order(*order_id))
 }
 
 /// Return a copy of all orders that are in the book for this account.
