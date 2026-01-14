@@ -174,15 +174,15 @@ public(package) fun update_historic_median(self: &mut History) {
         return
     };
     let mut median_vec = vector<u128>[];
-    let mut i = self.epoch - constants::phase_out_epochs();
-    while (i < self.epoch) {
+    let start_epoch = self.epoch - constants::phase_out_epochs();
+    constants::phase_out_epochs().do!(|offset| {
+        let i = start_epoch + offset;
         if (self.historic_volumes.contains(i)) {
             median_vec.push_back(self.historic_volumes[i].total_volume);
         } else {
             median_vec.push_back(0);
         };
-        i = i + 1;
-    };
+    });
 
     self.volumes.historic_median = math::median(median_vec);
 }

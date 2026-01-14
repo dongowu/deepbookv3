@@ -325,11 +325,7 @@ public(package) fun calculate_partial_fill_balances(
     taker_fee_quantity.mul(taker_fee);
     self.paid_fees = taker_fee_quantity.non_zero_value();
 
-    let fills = &mut self.fills;
-    let mut i = 0;
-    let num_fills = fills.length();
-    while (i < num_fills) {
-        let fill = &mut fills[i];
+    self.fills.do_mut!(|fill| {
         if (!fill.expired()) {
             let base_quantity = fill.base_quantity();
             let quote_quantity = fill.quote_quantity();
@@ -343,9 +339,7 @@ public(package) fun calculate_partial_fill_balances(
             fill_taker_fee_quantity.mul(taker_fee);
             fill.set_fill_taker_fee(&fill_taker_fee_quantity);
         };
-
-        i = i + 1;
-    };
+    });
 
     let mut settled_balances = balances::new(0, 0, 0);
     let mut owed_balances = balances::new(0, 0, 0);
@@ -511,10 +505,7 @@ public(package) fun match_maker(self: &mut OrderInfo, maker: &mut Order, timesta
 /// To avoid DOS attacks, 100 fills are emitted at a time. Up to 10,000
 /// fills can be emitted in a single call.
 public(package) fun emit_orders_filled(self: &OrderInfo, timestamp: u64) {
-    let mut i = 0;
-    let num_fills = self.fills.length();
-    while (i < num_fills) {
-        let fill = &self.fills[i];
+    self.fills.do_ref!(|fill| {
         if (fill.completed()) {
             self.emit_order_fully_filled(
                 fill.maker_order_id(),
@@ -535,8 +526,7 @@ public(package) fun emit_orders_filled(self: &OrderInfo, timestamp: u64) {
                 event::emit(self.order_expired_from_fill(fill, timestamp));
             };
         };
-        i = i + 1;
-    };
+    });
 }
 
 public(package) fun emit_order_placed(self: &OrderInfo) {

@@ -436,10 +436,7 @@ public(package) fun history(self: &State): &History {
 // === Private Functions ===
 /// Process fills for all makers. Update maker accounts and history.
 fun process_fills(self: &mut State, fills: &mut vector<Fill>, ctx: &TxContext) {
-    let mut i = 0;
-    let num_fills = fills.length();
-    while (i < num_fills) {
-        let fill = &mut fills[i];
+    fills.do_mut!(|fill| {
         let maker = fill.balance_manager_id();
         self.update_account(maker, ctx);
         let account = &mut self.accounts[maker];
@@ -462,9 +459,7 @@ fun process_fills(self: &mut State, fills: &mut vector<Fill>, ctx: &TxContext) {
         } else {
             account.add_settled_balances(fee_quantity);
         };
-
-        i = i + 1;
-    };
+    });
 }
 
 /// If account doesn't exist, create it. Update account volumes and rebates.
