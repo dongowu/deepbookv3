@@ -25,8 +25,6 @@ use deepbook::{
     math,
     order::Order,
     order_info::{Self, OrderInfo},
-    pool_flashloan,
-    pool_governance,
     registry::{DeepbookAdminCap, Registry},
     state::{Self, State},
     vault::{Self, Vault, FlashLoan}
@@ -631,15 +629,8 @@ public fun stake<BaseAsset, QuoteAsset>(
 ) {
     assert!(amount > 0, EInvalidStake);
     let self = self.load_inner_mut();
-    pool_governance::stake_impl(
-        &mut self.state,
-        &mut self.vault,
-        self.pool_id,
-        balance_manager,
-        trade_proof,
-        amount,
-        ctx,
-    );
+    let (settled, owed) = self.state.process_stake(self.pool_id, balance_manager.id(), amount, ctx);
+    self.vault.settle_balance_manager(settled, owed, balance_manager, trade_proof);
 }
 
 /// Unstake DEEP tokens from the pool. The balance_manager must have enough
@@ -653,14 +644,8 @@ public fun unstake<BaseAsset, QuoteAsset>(
     ctx: &TxContext,
 ) {
     let self = self.load_inner_mut();
-    pool_governance::unstake_impl(
-        &mut self.state,
-        &mut self.vault,
-        self.pool_id,
-        balance_manager,
-        trade_proof,
-        ctx,
-    );
+    let (settled, owed) = self.state.process_unstake(self.pool_id, balance_manager.id(), ctx);
+    self.vault.settle_balance_manager(settled, owed, balance_manager, trade_proof);
 }
 
 /// Submit a proposal to change the taker fee, maker fee, and stake required.
@@ -680,11 +665,10 @@ public fun submit_proposal<BaseAsset, QuoteAsset>(
     ctx: &TxContext,
 ) {
     let self = self.load_inner_mut();
-    pool_governance::proposal_impl(
-        &mut self.state,
+    balance_manager.validate_proof(trade_proof);
+    self.state.process_proposal(
         self.pool_id,
-        balance_manager,
-        trade_proof,
+        balance_manager.id(),
         taker_fee,
         maker_fee,
         stake_required,
@@ -704,14 +688,8 @@ public fun vote<BaseAsset, QuoteAsset>(
     ctx: &TxContext,
 ) {
     let self = self.load_inner_mut();
-    pool_governance::vote_impl(
-        &mut self.state,
-        self.pool_id,
-        balance_manager,
-        trade_proof,
-        proposal_id,
-        ctx,
-    );
+    balance_manager.validate_proof(trade_proof);
+    self.state.process_vote(self.pool_id, balance_manager.id(), proposal_id, ctx);
 }
 
 /// Claim the rewards for the balance_manager. The balance_manager must have
@@ -724,14 +702,12 @@ public fun claim_rebates<BaseAsset, QuoteAsset>(
     ctx: &TxContext,
 ) {
     let self = self.load_inner_mut();
-    pool_governance::claim_rebates_impl(
-        &mut self.state,
-        &mut self.vault,
+    let (settled, owed) = self.state.process_claim_rebates<BaseAsset, QuoteAsset>(
         self.pool_id,
         balance_manager,
-        trade_proof,
         ctx,
     );
+    self.vault.settle_balance_manager(settled, owed, balance_manager, trade_proof);
 }
 
 // === Public-Mutative Functions * FLASHLOAN * ===
@@ -743,7 +719,7 @@ public fun borrow_flashloan_base<BaseAsset, QuoteAsset>(
     ctx: &mut TxContext,
 ): (Coin<BaseAsset>, FlashLoan) {
     let self = self.load_inner_mut();
-    pool_flashloan::borrow_base(&mut self.vault, self.pool_id, base_amount, ctx)
+    self.vault.borrow_flashloan_base(self.pool_id, base_amount, ctx)
 }
 
 /// Borrow quote assets from the Pool. A hot potato is returned,
@@ -754,7 +730,7 @@ public fun borrow_flashloan_quote<BaseAsset, QuoteAsset>(
     ctx: &mut TxContext,
 ): (Coin<QuoteAsset>, FlashLoan) {
     let self = self.load_inner_mut();
-    pool_flashloan::borrow_quote(&mut self.vault, self.pool_id, quote_amount, ctx)
+    self.vault.borrow_flashloan_quote(self.pool_id, quote_amount, ctx)
 }
 
 /// Return the flashloaned base assets to the Pool.
@@ -766,7 +742,7 @@ public fun return_flashloan_base<BaseAsset, QuoteAsset>(
     flash_loan: FlashLoan,
 ) {
     let self = self.load_inner_mut();
-    pool_flashloan::return_base(&mut self.vault, self.pool_id, coin, flash_loan);
+    self.vault.return_flashloan_base(self.pool_id, coin, flash_loan);
 }
 
 /// Return the flashloaned quote assets to the Pool.
@@ -778,7 +754,7 @@ public fun return_flashloan_quote<BaseAsset, QuoteAsset>(
     flash_loan: FlashLoan,
 ) {
     let self = self.load_inner_mut();
-    pool_flashloan::return_quote(&mut self.vault, self.pool_id, coin, flash_loan);
+    self.vault.return_flashloan_quote(self.pool_id, coin, flash_loan);
 }
 
 // === Public-Mutative Functions * OPERATIONAL * ===
